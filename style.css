@@ -920,3 +920,166 @@ body {
     font-size: 0.8rem;
   }
 }
+
+/* ==========================================================================
+   ✨ Gemini Live Smart Math Studio & KaTeX Dashboard Styles
+   ========================================================================== */
+.math-studio-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 600px;
+}
+
+.studio-header {
+  border-bottom: 1px solid rgba(0, 240, 255, 0.18);
+  padding-bottom: 10px;
+}
+
+/* 1. 제미니 원문 텍스트 카드 */
+.source-text-card {
+  background: rgba(13, 20, 36, 0.75);
+  border: 1px solid rgba(0, 240, 255, 0.22);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  transition: all 0.25s ease;
+}
+
+.source-text-card:focus-within {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 18px rgba(0, 240, 255, 0.3);
+}
+
+.card-mini-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: 0.3px;
+}
+
+.badge-sub {
+  font-size: 0.68rem;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(0, 240, 255, 0.15);
+  color: var(--neon-cyan);
+  padding: 2px 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 240, 255, 0.3);
+}
+
+.gemini-raw-editor {
+  width: 100%;
+  min-height: 120px;
+  max-height: 200px;
+  background: rgba(6, 11, 20, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-sm);
+  color: #e2e8f0;
+  font-family: 'Outfit', -apple-system, sans-serif;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  padding: 10px 12px;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.gemini-raw-editor:focus {
+  border-color: rgba(0, 240, 255, 0.5);
+  background: rgba(8, 14, 25, 0.9);
+}
+
+/* 2. 정제된 KaTeX 표준 수식 & 대수 검증 카드 */
+.refined-math-card {
+  background: linear-gradient(145deg, rgba(16, 26, 48, 0.85), rgba(9, 15, 28, 0.9));
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4), inset 0 0 15px rgba(0, 240, 255, 0.05);
+}
+
+.katex-hero-display {
+  background: rgba(5, 9, 18, 0.85);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 16px 18px;
+  font-size: 1.45rem;
+  color: #00f0ff;
+  font-family: 'JetBrains Mono', 'Cambria Math', serif;
+  font-weight: 600;
+  text-shadow: 0 0 14px rgba(0, 240, 255, 0.45);
+  min-height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Math.js 진단 박스 */
+.math-diagnostic-box {
+  background: rgba(0, 255, 136, 0.06);
+  border: 1px solid rgba(0, 255, 136, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  transition: all 0.3s ease;
+}
+
+.math-diagnostic-box.error {
+  background: rgba(255, 51, 102, 0.08);
+  border-color: rgba(255, 51, 102, 0.35);
+}
+
+.math-diagnostic-box.warning {
+  background: rgba(255, 208, 0, 0.08);
+  border-color: rgba(255, 208, 0, 0.35);
+}
+
+.diag-icon-col {
+  font-size: 1.1rem;
+  line-height: 1.2;
+}
+
+.diag-content-col {
+  flex: 1;
+}
+
+.diag-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--text-sub);
+  margin-bottom: 2px;
+}
+
+.diag-detail {
+  font-size: 0.84rem;
+  color: #fff;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+/* 수식 카드 하단 버튼 바 */
+.refined-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}

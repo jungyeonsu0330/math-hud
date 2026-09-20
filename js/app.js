@@ -5,17 +5,17 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Pinned Math Box Elements (1번 사진 박스)
-  const pinnedBox = document.getElementById('live-pinned-math-box');
-  const pinnedTranscriptText = document.getElementById('pinned-transcript-text');
+  // Smart Math Studio Elements (개편된 올인원 대시보드)
+  const geminiRawTextarea = document.getElementById('gemini-raw-textarea');
+  const charCountBadge = document.getElementById('char-count-badge');
   const pinnedLatexDisplay = document.getElementById('pinned-latex-display');
   const pinnedDiagBadge = document.getElementById('pinned-diag-badge');
   const pinnedMathNote = document.getElementById('pinned-math-note');
   const pinnedCopyBtn = document.getElementById('pinned-copy-btn');
   const pinnedSendChatBtn = document.getElementById('pinned-send-chat-btn');
+  const mathDiagBox = document.querySelector('.math-diagnostic-box');
 
-  // Chat Elements
-  const chatMessagesArea = document.getElementById('kakao-chat-messages');
+  // Chat / Input Elements
   const chatQuickInput = document.getElementById('chat-quick-input');
   const chatSendBtn = document.getElementById('chat-send-btn');
   const quickScenarioBtn = document.getElementById('quick-scenario-btn');
@@ -53,21 +53,28 @@ document.addEventListener('DOMContentLoaded', () => {
     return `${mm}:${ss}`;
   }
 
-  // 2. 고정 실시간 수식 박스(1번 사진 박스) 갱신 함수
-  function updatePinnedMathBox(text, customLatex = null, customDiag = null) {
-    if (pinnedTranscriptText) {
-      pinnedTranscriptText.textContent = text;
+  // 2. 스마트 수식 대시보드 갱신 함수 (텍스트 에디터 ➔ KaTeX ➔ Math.js ➔ 그래프)
+  function updatePinnedMathBox(text, customLatex = null, customDiag = null, isFromEditor = false) {
+    if (!text) return;
+
+    // 2-1. 원문 텍스트 에디터 동기화
+    if (!isFromEditor && geminiRawTextarea) {
+      geminiRawTextarea.value = text;
+    }
+    if (charCountBadge) {
+      charCountBadge.textContent = `${text.length}자 실시간 분석 중`;
     }
 
+    // 2-2. 수식 추출 및 LaTeX 정규화
     const detectedLatex = customLatex || MathParser.extractCoreEquation(text);
     currentPinnedLatex = detectedLatex;
 
-    // 수식 렌더링 (KaTeX 또는 네이티브 수식)
+    // 2-3. KaTeX 수식 렌더링
     if (pinnedLatexDisplay && detectedLatex) {
       MathParser.renderLatexToElement(pinnedLatexDisplay, detectedLatex, false);
     }
 
-    // 진단 분석
+    // 2-4. Math.js 컴퓨터 대수 및 비약 정밀 검증
     const diag = customDiag || ProofChecker.analyzeStep(text, detectedLatex);
     if (pinnedDiagBadge) {
       if (diag.status === 'error') {
@@ -85,12 +92,30 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
+    // 2-5. Math.js 진단 박스 피드백 메시지
     if (pinnedMathNote) {
       pinnedMathNote.textContent = diag.message || '수학적 등호 성립 및 식 변형 검토 완료';
     }
+    if (mathDiagBox) {
+      mathDiagBox.classList.remove('error', 'warning');
+      if (diag.status === 'error') mathDiagBox.classList.add('error');
+      else if (diag.status === 'warning') mathDiagBox.classList.add('warning');
+    }
 
-    // 우측 그래프 자동 연동
+    // 2-6. 우측 인터랙티브 그래프 자동 연동
     updateGraphByMathText(text);
+  }
+
+  // 2-7. 📝 원문 에디터 직접 편집 시 실시간 디바운스 자동 갱신
+  let editorDebounceTimer = null;
+  if (geminiRawTextarea) {
+    geminiRawTextarea.addEventListener('input', (e) => {
+      const val = e.target.value.trim();
+      clearTimeout(editorDebounceTimer);
+      editorDebounceTimer = setTimeout(() => {
+        if (val) updatePinnedMathBox(val, null, null, true);
+      }, 250);
+    });
   }
 
   // 3. 카카오톡 대화방 메시지 추가 함수
@@ -194,18 +219,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
   loadInitialState();
 
-  // 5. 고정 박스 버튼 이벤트
-  pinnedCopyBtn.addEventListener('click', () => {
-    const scenario = QuestionPromptsManager.getScenario('scenario1');
-    addUserBubble(scenario.firstQuestion.prompt);
-    QuestionPromptsManager.copyPromptToClipboard(scenario.firstQuestion.prompt, '반문 질문이 복사되어 제미니에게 전송 준비되었습니다!');
-  });
+  // 5. 수식 카드 버튼 이벤트
+  if (pinnedCopyBtn) {
+    pinnedCopyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(currentPinnedLatex);
+        QuestionPromptsManager.showToast(`📐 수식 [ ${currentPinnedLatex} ] 복사 완료!`, 'success');
+      } catch (e) {
+        QuestionPromptsManager.showToast('클립보드 복사 실패', 'warning');
+      }
+    });
+  }
 
-  pinnedSendChatBtn.addEventListener('click', () => {
-    const text = pinnedTranscriptText.textContent.trim();
-    addGeminiBubble(text, currentPinnedLatex);
-    QuestionPromptsManager.showToast('고정 박스의 수식 내용이 아래 카톡 대화창에 기록되었습니다.', 'info');
-  });
+  if (pinnedSendChatBtn) {
+    pinnedSendChatBtn.addEventListener('click', () => {
+      const scenario = QuestionPromptsManager.getScenario('scenario1');
+      const prompt = scenario ? scenario.firstQuestion.prompt : "이 수식의 대수적 풀이와 그래프 특징을 비교해줘.";
+      if (chatQuickInput) {
+        chatQuickInput.value = prompt;
+        chatQuickInput.focus();
+      }
+      QuestionPromptsManager.copyPromptToClipboard(prompt, '제미니에게 던질 반문 질문이 복사되고 입력창에 준비되었습니다!');
+    });
+  }
 
   // 6. 실시간 음성 인식 & Web Audio 감도 레벨 메타 & 클립보드 연동 시스템
   const levelFillEl = document.getElementById('audio-level-fill');
@@ -522,8 +558,23 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   clearChatBtn.addEventListener('click', () => {
-    chatMessagesArea.innerHTML = '<div style="text-align:center; padding:20px; color:var(--text-sub); font-size:0.85rem;">대화가 초기화되었습니다.</div>';
-    QuestionPromptsManager.showToast('대화방이 비워졌습니다.', 'info');
+    if (geminiRawTextarea) {
+      geminiRawTextarea.value = '';
+      geminiRawTextarea.placeholder = '제미니의 풀이 과정을 복사하여 붙여넣거나 직접 수식을 입력하세요...';
+    }
+    if (charCountBadge) charCountBadge.textContent = '대기 중';
+    if (pinnedLatexDisplay) {
+      pinnedLatexDisplay.innerHTML = '<span style="color:var(--text-sub); font-size:1rem; font-weight:400;">입력 대기 중... (제미니 답변을 붙여넣으세요)</span>';
+    }
+    if (pinnedMathNote) pinnedMathNote.textContent = '분석할 수식을 입력하거나 제미니 답변을 붙여넣으세요.';
+    if (pinnedDiagBadge) {
+      pinnedDiagBadge.textContent = '⚪ 대기 중';
+      pinnedDiagBadge.style.background = 'rgba(255,255,255,0.1)';
+      pinnedDiagBadge.style.color = 'var(--text-sub)';
+    }
+    if (mathDiagBox) mathDiagBox.classList.remove('error', 'warning');
+    lastProcessedClipboard = '';
+    QuestionPromptsManager.showToast('풀이 텍스트 및 수식 화면이 깨끗하게 비워졌습니다.', 'info');
   });
 
   // 8. 하단 메시지 전송 바

@@ -910,11 +910,6 @@ body {
         </span>
       </button>
 
-      <!-- 원터치 클립보드 붙여넣기 버튼 -->
-      <button id="paste-clipboard-btn" class="hud-btn" title="제미니 대화창에서 복사한 텍스트 즉시 가져오기">
-        <span>📋</span> 클립보드 붙여넣기
-      </button>
-
       <!-- 전체화면 토글 버튼 -->
       <button id="fullscreen-btn" class="hud-btn" title="태블릿 전체화면 전환">
         <span>⛶</span>
@@ -924,10 +919,10 @@ body {
 
   <!-- Main HUD Grid -->
   <main class="main-hud-grid">
-    <!-- Left Column: Kakao-style Live Call Transcript & Math HUD (2번 사진 100% 모티브) -->
-    <section class="hud-panel left-column kakao-chat-panel">
-      <!-- 📞 Gemini Live 수학 통화 ❤️ 헤더 (실시간 음성 듣기 & 전송 컨트롤러 직결) -->
-      <div class="kakao-chat-header">
+    <!-- Left Column: Gemini Live Smart Math Studio & HUD -->
+    <section class="hud-panel left-column math-studio-panel">
+      <!-- 스튜디오 헤더 -->
+      <div class="kakao-chat-header studio-header">
         <div class="caller-profile">
           <div class="caller-avatar">
             <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
@@ -938,74 +933,72 @@ body {
           </div>
           <div class="caller-info">
             <div class="caller-name">
-              <span>📞 Gemini Live 수학 통화</span>
-              <span class="heart-badge">❤️</span>
+              <span>Gemini Live 스마트 수학 스튜디오</span>
+              <span class="heart-badge">✨</span>
             </div>
             <div class="caller-status">
               <span class="live-dot-wave"></span>
-              <span id="call-mic-status-text">실시간 음성 연결됨</span>
+              <span id="call-mic-status-text">원터치 클립보드 & 대수 검증 가동 중</span>
             </div>
           </div>
         </div>
 
-        <!-- 헤더 내장 실시간 음성 듣기/전송 구글 마이크 버튼 -->
         <div class="chat-header-actions">
-          <button id="call-mic-btn" class="hud-btn mic-btn" data-state="listening" onclick="window.toggleCallMic()" style="padding: 6px 12px; font-size: 0.8rem;" title="터치하여 실시간 음성 청취 On/Off 토글">
-            <span class="google-mic-wrapper">
-              <svg class="google-mic-icon" viewBox="0 0 24 24" width="18" height="18">
-                <path fill="#4285F4" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                <path fill="#34A853" d="M11 18.93V21h2v-2.07c3.39-.49 6-3.4 6-6.93h-2c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.44 6 6.93z"/>
-                <path fill="#FBBC05" d="M7 12H5c0 1.93.78 3.68 2.05 4.95l1.41-1.41C7.56 14.63 7 13.38 7 12z"/>
-                <path fill="#EA4335" d="M12 17c-1.38 0-2.63-.56-3.54-1.46l-1.41 1.41C8.32 18.22 10.07 19 12 19c1.93 0 3.68-.78 4.95-2.05l-1.41-1.41C14.63 16.44 13.38 17 12 17z"/>
-              </svg>
-            </span>
-            <span id="call-mic-label">🔴 듣는 중...</span>
-            <span class="sound-wave-container">
-              <span class="sound-wave-bar"></span>
-              <span class="sound-wave-bar"></span>
-              <span class="sound-wave-bar"></span>
-            </span>
+          <button id="quick-paste-live-btn" class="hud-btn primary" style="padding: 6px 13px; font-size: 0.8rem; font-weight: 700;">
+            <span>📋 제미니 답변 붙여넣기</span>
           </button>
-          <button id="sample-preset-1" class="hud-btn" style="padding: 5px 8px; font-size: 0.72rem;">접선</button>
-          <button id="sample-preset-2" class="hud-btn" style="padding: 5px 8px; font-size: 0.72rem;">함정</button>
-          <button id="clear-chat-btn" class="hud-btn" style="padding: 5px 8px; font-size: 0.72rem;">비우기</button>
+          <button id="sample-preset-1" class="hud-btn" style="padding: 5px 9px; font-size: 0.74rem;">접선 예제</button>
+          <button id="sample-preset-2" class="hud-btn" style="padding: 5px 9px; font-size: 0.74rem;">함정 예제</button>
+          <button id="clear-chat-btn" class="hud-btn" style="padding: 5px 9px; font-size: 0.74rem;">비우기</button>
         </div>
       </div>
 
-      <!-- ⭐ 1번 사진 박스: 통화 헤더 바로 아래 고정된 실시간 수식 정제 & 검증 박스 ⭐ -->
-      <div id="live-pinned-math-box" class="live-pinned-math-container">
-        
-        <!-- 실시간 마이크 입력 감도 & 원터치 클립보드 퀵 바 -->
-        <div class="mic-live-meter-bar">
-          <div class="audio-level-display">
-            <span style="font-size:0.75rem; color:var(--text-sub);">마이크 입력 레벨:</span>
-            <div class="level-meter-track">
-              <div id="audio-level-fill" class="level-meter-fill"></div>
-            </div>
-            <span id="audio-level-val" style="font-size:0.72rem; color:var(--neon-cyan); font-family:'JetBrains Mono';">0%</span>
-          </div>
-          <button id="quick-paste-live-btn" class="hud-btn primary" style="padding:4px 10px; font-size:0.75rem;">
-            <span>📋 제미니 답변 즉시 붙여넣기</span>
-          </button>
+      <!-- 1. 제미니 원문 풀이 텍스트 창 (전체 서술형 풀이 읽기 & 수정 에디터) -->
+      <div class="source-text-card">
+        <div class="card-mini-header">
+          <span class="card-label">📝 제미니 원문 풀이 (자동 동기화 / 직접 편집 가능):</span>
+          <span id="char-count-badge" class="badge-sub">실시간 감지 ON</span>
+        </div>
+        <textarea id="gemini-raw-textarea" class="gemini-raw-editor" placeholder="제미니의 풀이 과정을 복사하여 붙여넣거나 직접 수식을 입력하세요...">오늘 풀 문제는 함수 f(x) = x^3 - 3x + 2 에 대하여 x가 1일 때의 접선의 방정식을 구하고 극값을 판정하는 거야.</textarea>
+      </div>
+
+      <!-- 2. 정제된 KaTeX 표준 수식 & Math.js 대수 검증 메인 대시보드 -->
+      <div class="refined-math-card">
+        <div class="card-mini-header">
+          <span class="card-label">📐 정제 표준 수식 (KaTeX 고속 렌더링):</span>
+          <span id="pinned-diag-badge" class="step-diag-badge" style="background:rgba(0,255,136,0.18); color:var(--neon-green);">🟢 논리 무결</span>
         </div>
 
-        <div class="pinned-speech-row">
-          <span class="gemini-voice-prefix">
-            <span class="sound-bars-mini"><span></span><span></span><span></span></span>
-            Gemini Live
-          </span>
-          <span id="pinned-transcript-text" class="pinned-transcript">오늘 풀 문제는 함수 f(x) = x^3 - 3x + 2 에 대하여 x가 1일 때의 접선의 방정식을 구하고 극값을 판정하는 거야.</span>
-          <span class="typing-cursor"></span>
+        <!-- 대형 KaTeX 수식 디스플레이 -->
+        <div id="pinned-latex-display" class="katex-hero-display">
+          f(x) = x³ - 3x + 2 &nbsp; ⟹ &nbsp; f'(x) = 3x² - 3
         </div>
 
-        <!-- 1번 사진 내부 정제 표준 수식 박스 -->
-        <div class="bubble-math-card pinned-math-card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">📐 정제 표준 수식:</span>
-            <span id="pinned-diag-badge" class="step-diag-badge" style="background:rgba(0,255,136,0.18); color:var(--neon-green);">🟢 논리 무결</span>
+        <!-- Math.js 컴퓨터 대수 정밀 진단 피드백 -->
+        <div class="math-diagnostic-box">
+          <div class="diag-icon-col">💡</div>
+          <div class="diag-content-col">
+            <div class="diag-title">Math.js CAS 정밀 진단:</div>
+            <div id="pinned-math-note" class="diag-detail">x = 1 대입 시 f'(1) = 0 (수평 접선 y = 0 형성 및 등호 성립 완료)</div>
           </div>
-          
-          <div id="pinned-latex-display" class="bubble-math-latex" style="font-size:1.35rem; color:#00f0ff; min-height:36px; display:flex; align-items:center;">
+        </div>
+
+        <!-- 수식 카드 하단 액션 버튼 바 -->
+        <div class="refined-card-actions">
+          <button id="pinned-copy-btn" class="hud-btn primary" style="padding:6px 12px; font-size:0.78rem;">수식 TeX 복사 📋</button>
+          <button id="pinned-send-chat-btn" class="hud-btn gold" style="padding:6px 12px; font-size:0.78rem;">제미니 꼬리질문 생성 🚀</button>
+        </div>
+      </div>
+
+      <!-- 하단 메시지/반문 전송 바 -->
+      <div class="kakao-chat-input-bar">
+        <button id="quick-scenario-btn" class="hud-btn primary" style="padding: 7px 12px; font-size: 0.8rem;" title="제미니 반문 즉시 발송">
+          <span>💬 반문 전송</span>
+        </button>
+        <input type="text" id="chat-quick-input" placeholder="제미니에게 반문할 내용이나 수식을 입력하세요..." />
+        <button id="chat-send-btn" class="hud-btn gold" style="padding: 7px 14px; font-size: 0.82rem;">전송</button>
+      </div>
+    </section>tex" style="font-size:1.35rem; color:#00f0ff; min-height:36px; display:flex; align-items:center;">
             f(x) = x³ - 3x + 2 &nbsp; ⟹ &nbsp; f'(x) = 3x² - 3
           </div>
 
