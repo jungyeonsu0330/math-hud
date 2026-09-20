@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Gemini Math Live HUD - 실시간 수학 수식 및 다각도 풀이 보조기</title>
+  
+  <!-- PWA Meta Tags -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#070a12">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Math HUD">
+  <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
+  <link rel="apple-touch-icon" href="./icons/icon.svg">
+
+  <!-- KaTeX (수학 수식 초고속 렌더링) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+
+  <!-- Math.js (정밀 대수 계산 및 수식 오류 검증 엔진) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.1/math.js"></script>
+
+  <!-- JSXGraph (초경량 수학 인터랙티브 애니메이션 엔진) -->
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraph.css" />
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraphcore.js"></script>
+
+  <!-- HUD Custom Styles (Inlined for 100% network fail-safe) -->
+  <link rel="stylesheet" href="./style.css">
+  <style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+:root {
+  --bg-primary: #070a12;
+  --bg-secondary: #0d1322;
+  --bg-card: rgba(16, 24, 40, 0.75);
+  --bg-card-hover: rgba(22, 34, 56, 0.85);
+  --border-color: rgba(0, 240, 255, 0.2);
+  --border-glow: rgba(0, 240, 255, 0.45);
+  
+  --neon-cyan: #00f0ff;
+  --neon-purple: #9d4edd;
+  --neon-gold: #ffd000;
+  --neon-pink: #ff3366;
+  --neon-green: #00ff88;
+  
+  --text-main: #f0f4fc;
+  --text-muted: #8e9bb4;
+  --text-sub: #5d6c88;
+  
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  
+  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
+  --hud-glow: 0 0 15px rgba(0, 240, 255, 0.35);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-main);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(circle at 15% 10%, rgba(0, 240, 255, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 85% 85%, rgba(157, 78, 221, 0.08) 0%, transparent 40%),
+    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+}
+
+/* Header & HUD Status Bar */
+.hud-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(10, 15, 25, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--border-color);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-logo {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(157, 78, 221, 0.3));
+  border: 1px solid var(--neon-cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--hud-glow);
+}
+
+.brand-logo svg {
+  width: 24px;
+  height: 24px;
+}
+
+.brand-title h1 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: linear-gradient(90deg, #ffffff, var(--neon-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.brand-title .badge {
+  display: inline-block;
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(0, 240, 255, 0.15);
+  color: var(--neon-cyan);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  font-weight: 600;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.quick-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Control Buttons */
+.hud-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--border-color);
+  background: rgba(16, 24, 40, 0.6);
+  color: var(--text-main);
+  outline: none;
+  user-select: none;
+}
+
+.hud-btn:hover {
+  background: var(--bg-card-hover);
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 12px rgba(0, 240, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+.hud-btn:active {
+  transform: translateY(1px);
+}
+
+.hud-btn.mic-btn {
+  border-color: rgba(0, 240, 255, 0.35);
+  color: var(--neon-cyan);
+  background: rgba(0, 240, 255, 0.08);
+  position: relative;
+  overflow: hidden;
+}
+
+.hud-btn.mic-btn:hover {
+  background: rgba(0, 240, 255, 0.15);
+  border-color: var(--neon-cyan);
+}
+
+.google-mic-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.google-mic-icon {
+  display: block;
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hud-btn.mic-btn:hover .google-mic-icon {
+  transform: scale(1.15);
+}
+
+/* 마이크 버튼 상태별 초강력 스타일 */
+.hud-btn.mic-btn[data-state="idle"] {
+  border-color: rgba(0, 240, 255, 0.35);
+  color: var(--neon-cyan);
+  background: rgba(0, 240, 255, 0.08);
+}
+
+/* 1번째 눌렀을 때: 듣는 중 상태 (구글 4색 네온 펄스) */
+.hud-btn.mic-btn[data-state="listening"] {
+  background: rgba(66, 133, 244, 0.25) !important;
+  border-color: #4285F4 !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 25px rgba(66, 133, 244, 0.8) !important;
+  animation: pulse-border-google 1.2s infinite alternate;
+}
+
+/* 2번째 눌렀을 때: 확실한 붉은색 종료 상태 (누구나 바로 인식되는 강렬한 Red) */
+.hud-btn.mic-btn[data-state="stopped"] {
+  background: #d93025 !important; /* 구글 공식 경고 레드 */
+  border-color: #ffffff !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 0 30px #d93025, 0 0 15px rgba(255, 255, 255, 0.8) !important;
+  animation: blink-super-red 0.6s infinite alternate !important;
+}
+
+@keyframes blink-super-red {
+  0% {
+    background: #d93025;
+    box-shadow: 0 0 15px #d93025;
+    transform: scale(0.98);
+  }
+  100% {
+    background: #ff4d4d;
+    box-shadow: 0 0 35px #ff1a1a, 0 0 15px #ffffff;
+    transform: scale(1.04);
+  }
+}
+
+.sound-wave-container {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 16px;
+  margin-left: 4px;
+}
+
+.sound-wave-bar {
+  width: 3px;
+  height: 4px;
+  background-color: #ffffff;
+  border-radius: 2px;
+  transition: height 0.08s ease;
+}
+
+.hud-btn.primary {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.2), rgba(112, 0, 255, 0.3));
+  border-color: var(--neon-cyan);
+  color: #fff;
+}
+
+.hud-btn.gold {
+  background: rgba(255, 208, 0, 0.12);
+  border-color: rgba(255, 208, 0, 0.4);
+  color: var(--neon-gold);
+}
+
+/* Main Layout Grid */
+.main-hud-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 18px;
+  padding: 18px 20px;
+  max-width: 1700px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+@media (max-width: 992px) {
+  .main-hud-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.hud-panel {
+  background: var(--bg-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  box-shadow: var(--glass-shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: #fff;
+}
+
+.input-hud-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(8, 12, 20, 0.7);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+.input-hud-box textarea {
+  width: 100%;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 52px;
+}
+
+.formula-display-card {
+  background: linear-gradient(135deg, rgba(0, 240, 255, 0.05), rgba(157, 78, 221, 0.08));
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  position: relative;
+}
+
+.formula-display-card .card-badge {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  text-transform: uppercase;
+}
+
+.katex-render-box {
+  font-size: 1.25rem;
+  color: #fff;
+  padding: 10px 0;
+  overflow-x: auto;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+}
+
+.steps-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 450px;
+  overflow-y: auto;
+}
+
+.step-card {
+  background: rgba(13, 20, 35, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.step-card.step-pass { border-left: 4px solid var(--neon-green); }
+.step-card.step-warning { border-left: 4px solid var(--neon-gold); background: rgba(255, 208, 0, 0.04); }
+.step-card.step-error { border-left: 4px solid var(--neon-pink); background: rgba(255, 51, 102, 0.06); }
+
+.step-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.step-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--neon-cyan);
+  background: rgba(0, 240, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.step-diag-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.step-pass .step-diag-badge { background: rgba(0, 255, 136, 0.15); color: var(--neon-green); }
+.step-warning .step-diag-badge { background: rgba(255, 208, 0, 0.15); color: var(--neon-gold); }
+.step-error .step-diag-badge { background: rgba(255, 51, 102, 0.18); color: var(--neon-pink); }
+
+.step-feedback {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.right-column-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+#jxgbox {
+  width: 100%;
+  height: 280px;
+  background-color: #070d18;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.graph-stats-hud {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: rgba(8, 14, 25, 0.7);
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.stat-item { display: flex; flex-direction: column; gap: 2px; }
+.stat-label { font-size: 0.65rem; color: var(--text-sub); }
+.stat-val { font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; font-weight: 700; color: var(--neon-cyan); }
+
+.scenario-tabs {
+  display: flex;
+  gap: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 8px;
+  overflow-x: auto;
+}
+
+.tab-btn {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tab-btn.active {
+  background: rgba(0, 240, 255, 0.12);
+  border-color: var(--neon-cyan);
+  color: var(--neon-cyan);
+}
+
+.prompt-card {
+  background: rgba(10, 16, 30, 0.75);
+  border: 1px solid rgba(0, 240, 255, 0.2);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.prompt-badge {
+  display: inline-block;
+  align-self: flex-start;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(157, 78, 221, 0.2);
+  color: #c77dff;
+  border: 1px solid rgba(157, 78, 221, 0.4);
+}
+
+.prompt-text {
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-main);
+  background: rgba(0, 0, 0, 0.3);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.follow-ups-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.follow-up-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  background: rgba(16, 25, 45, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+}
+
+.copy-mini-btn {
+  padding: 5px 9px;
+  font-size: 0.72rem;
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+  color: var(--neon-cyan);
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.hud-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: rgba(12, 18, 32, 0.95);
+  border: 1px solid var(--neon-cyan);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 30px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  z-index: 1000;
+  opacity: 0;
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+.hud-toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.hud-modal-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(10px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2000; opacity: 0; pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.hud-modal-overlay.show { opacity: 1; pointer-events: auto; }
+
+/* ========================================================
+   2번 사진 100% 모티브: 카카오톡 AI 통화 자막 스타일
+   ======================================================== */
+.kakao-chat-panel {
+  display: flex;
+  flex-direction: column;
+  height: 680px;
+  max-height: 82vh;
+  padding: 0 !important;
+  background: rgba(11, 17, 30, 0.85) !important;
+  border: 1px solid rgba(0, 240, 255, 0.25) !important;
+  overflow: hidden;
+}
+
+.kakao-chat-header {
+  padding: 12px 16px;
+  background: rgba(15, 23, 42, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.caller-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.caller-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4285F4, #9d4edd);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 10px rgba(66, 133, 244, 0.5);
+}
+
+.caller-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.caller-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.heart-badge {
+  font-size: 0.8rem;
+  animation: pulse-heart 1.5s infinite;
+}
+
+@keyframes pulse-heart {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+.caller-status {
+  font-size: 0.72rem;
+  color: var(--neon-cyan);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.live-dot-wave {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--neon-green);
+  box-shadow: 0 0 8px var(--neon-green);
+}
+
+/* ========================================================
+   1번 사진 박스: 통화 헤더 바로 아래 고정된 실시간 수식 박스
+   ======================================================== */
+.live-pinned-math-container {
+  padding: 12px 16px;
+  background: rgba(13, 20, 36, 0.95);
+  border-bottom: 2px solid rgba(0, 240, 255, 0.3);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  animation: fadeInDown 0.3s ease;
+}
+
+@keyframes fadeInDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.pinned-speech-row {
+  display: flex;
+  align-items: center;
+  font-size: 0.9rem;
+  color: #f1f5f9;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.pinned-transcript {
+  font-weight: 500;
+}
+
+.pinned-math-card {
+  margin-top: 2px !important;
+  background: rgba(8, 14, 25, 0.9) !important;
+  border: 1px solid rgba(0, 240, 255, 0.45) !important;
+  box-shadow: 0 0 15px rgba(0, 240, 255, 0.15) !important;
+}
+
+/* 카카오톡 대화창 스크롤 영역 */
+.kakao-messages-area {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  scroll-behavior: smooth;
+}
+
+/* 말풍선 공통 */
+.chat-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+}
+
+.chat-row.gemini-row {
+  justify-content: flex-start;
+}
+
+.chat-row.user-row {
+  justify-content: flex-end;
+}
+
+.chat-bubble {
+  max-width: 82%;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  position: relative;
+  word-break: break-word;
+  transition: transform 0.2s ease;
+}
+
+/* 2번 사진: 상대방(제미니) 좌측 회색 말풍선 + 음파 아이콘 */
+.chat-bubble.gemini-bubble {
+  background: rgba(30, 41, 59, 0.9);
+  color: #f1f5f9;
+  border-radius: 18px 18px 18px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.gemini-voice-prefix {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 6px;
+  color: var(--neon-cyan);
+  font-weight: 700;
+  font-size: 0.8rem;
+}
+
+.sound-bars-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 12px;
+}
+
+.sound-bars-mini span {
+  width: 2px;
+  height: 8px;
+  background: var(--neon-cyan);
+  border-radius: 1px;
+}
+
+/* 말풍선 내부 임베드 수식 카드 */
+.bubble-math-card {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: rgba(8, 14, 25, 0.8);
+  border: 1px solid rgba(0, 240, 255, 0.35);
+  border-radius: 10px;
+}
+
+.bubble-math-latex {
+  font-size: 1.15rem;
+  color: #00f0ff;
+  font-weight: 700;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.bubble-math-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* 2번 사진: 나(사용자) 우측 카카오 옐로우 말풍선 */
+.chat-bubble.user-bubble {
+  background: #fee500 !important; /* 카카오 공식 옐로우 */
+  color: #191919 !important;
+  font-weight: 700;
+  border-radius: 18px 18px 4px 18px;
+  box-shadow: 0 4px 15px rgba(254, 229, 0, 0.35);
+}
+
+.chat-timestamp {
+  font-size: 0.68rem;
+  color: var(--text-sub);
+  white-space: nowrap;
+  margin-bottom: 2px;
+}
+
+/* 실시간 스트리밍 타이핑 애니메이션 */
+.typing-cursor {
+  display: inline-block;
+  width: 6px;
+  height: 14px;
+  background: var(--neon-cyan);
+  margin-left: 4px;
+  vertical-align: middle;
+  animation: blink-cur 0.8s infinite;
+}
+
+@keyframes blink-cur {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* 카카오톡 하단 입력 바 */
+.kakao-chat-input-bar {
+  padding: 10px 14px;
+  background: rgba(15, 23, 42, 0.95);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kakao-chat-input-bar input {
+  flex: 1;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  padding: 8px 16px;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.88rem;
+  outline: none;
+}
+
+.kakao-chat-input-bar input:focus {
+  border-color: var(--neon-cyan);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+}
+  </style>
+</head>
+<body>
+
+  <!-- PWA 홈화면 설치 안내 바 (앱 설치 안 되었을 때 표시 가능) -->
+  <div id="pwa-install-bar" class="pwa-banner" style="display: none;">
+    <span>📱 <strong>태블릿 팁:</strong> 브라우저 메뉴에서 <code>[홈 화면에 추가]</code>를 누르면 PC 없이 전용 앱으로 독립 실행됩니다.</span>
+    <button id="pwa-install-btn" class="hud-btn primary" style="padding: 4px 10px; font-size: 0.75rem;">설치하기</button>
+  </div>
+
+  <!-- Header & HUD Status Bar -->
+  <header class="hud-header">
+    <div class="brand-section">
+      <div class="brand-logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 19c2-5 4-8 8-8s6 3 8 8" stroke="#00f0ff" stroke-linecap="round"/>
+          <circle cx="12" cy="11" r="3" stroke="#ffd000" fill="#ffd000"/>
+          <path d="M3 5h6M6 2v6" stroke="#9d4edd" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="brand-title">
+        <h1>Gemini Math Live HUD <span class="badge">TABLET DUAL HUD</span></h1>
+      </div>
+    </div>
+
+    <!-- Quick Status and Action Controls -->
+    <div class="quick-controls">
+      <div class="system-status">
+        <div class="status-indicator"></div>
+        <span id="auto-restore-indicator" title="모든 설정 및 풀이 기록이 1초 전 상태로 자동 보존됩니다">⚡ Auto-Restore 활성</span>
+      </div>
+
+      <!-- 실시간 마이크 청취 토글 버튼 (구글 마이크 4색 아이콘 & 인라인 직접 핸들러) -->
+      <button id="mic-toggle-btn" class="hud-btn mic-btn" data-state="idle" onclick="window.handleMicClick()" title="구글 음성 실시간 캐치 (누르면 듣기, 다시 누르면 붉은색 종료)">
+        <span class="btn-icon google-mic-wrapper">
+          <svg class="google-mic-icon" viewBox="0 0 24 24" width="20" height="20">
+            <!-- Google 4-color Signature Microphone -->
+            <path fill="#4285F4" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+            <path fill="#34A853" d="M11 18.93V21h2v-2.07c3.39-.49 6-3.4 6-6.93h-2c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.44 6 6.93z"/>
+            <path fill="#FBBC05" d="M7 12H5c0 1.93.78 3.68 2.05 4.95l1.41-1.41C7.56 14.63 7 13.38 7 12z"/>
+            <path fill="#EA4335" d="M12 17c-1.38 0-2.63-.56-3.54-1.46l-1.41 1.41C8.32 18.22 10.07 19 12 19c1.93 0 3.68-.78 4.95-2.05l-1.41-1.41C14.63 16.44 13.38 17 12 17z"/>
+          </svg>
+        </span>
+        <span id="mic-btn-text">실시간 음성 시작</span>
+        <span class="sound-wave-container">
+          <span class="sound-wave-bar"></span>
+          <span class="sound-wave-bar"></span>
+          <span class="sound-wave-bar"></span>
+          <span class="sound-wave-bar"></span>
+        </span>
+      </button>
+
+      <!-- 원터치 클립보드 붙여넣기 버튼 -->
+      <button id="paste-clipboard-btn" class="hud-btn" title="제미니 대화창에서 복사한 텍스트 즉시 가져오기">
+        <span>📋</span> 클립보드 붙여넣기
+      </button>
+
+      <!-- 전체화면 토글 버튼 -->
+      <button id="fullscreen-btn" class="hud-btn" title="태블릿 전체화면 전환">
+        <span>⛶</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main HUD Grid -->
+  <main class="main-hud-grid">
+    <!-- Left Column: Kakao-style Live Call Transcript & Math HUD (2번 사진 100% 모티브) -->
+    <section class="hud-panel left-column kakao-chat-panel">
+      <!-- 📞 Gemini Live 수학 통화 ❤️ 헤더 (실시간 음성 듣기 & 전송 컨트롤러 직결) -->
+      <div class="kakao-chat-header">
+        <div class="caller-profile">
+          <div class="caller-avatar">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" fill="#4285F4"/>
+              <path d="M12 6a4 4 0 100 8 4 4 0 000-8z" fill="#fff"/>
+              <path d="M6 18c0-2.67 4-4 6-4s6 1.33 6 4" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="caller-info">
+            <div class="caller-name">
+              <span>📞 Gemini Live 수학 통화</span>
+              <span class="heart-badge">❤️</span>
+            </div>
+            <div class="caller-status">
+              <span class="live-dot-wave"></span>
+              <span id="call-mic-status-text">실시간 음성 연결됨</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 헤더 내장 실시간 음성 듣기/전송 구글 마이크 버튼 -->
+        <div class="chat-header-actions">
+          <button id="call-mic-btn" class="hud-btn mic-btn" data-state="listening" onclick="window.toggleCallMic()" style="padding: 6px 12px; font-size: 0.8rem;" title="터치하여 실시간 음성 청취 On/Off 토글">
+            <span class="google-mic-wrapper">
+              <svg class="google-mic-icon" viewBox="0 0 24 24" width="18" height="18">
+                <path fill="#4285F4" d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                <path fill="#34A853" d="M11 18.93V21h2v-2.07c3.39-.49 6-3.4 6-6.93h-2c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.44 6 6.93z"/>
+                <path fill="#FBBC05" d="M7 12H5c0 1.93.78 3.68 2.05 4.95l1.41-1.41C7.56 14.63 7 13.38 7 12z"/>
+                <path fill="#EA4335" d="M12 17c-1.38 0-2.63-.56-3.54-1.46l-1.41 1.41C8.32 18.22 10.07 19 12 19c1.93 0 3.68-.78 4.95-2.05l-1.41-1.41C14.63 16.44 13.38 17 12 17z"/>
+              </svg>
+            </span>
+            <span id="call-mic-label">🔴 듣는 중...</span>
+            <span class="sound-wave-container">
+              <span class="sound-wave-bar"></span>
+              <span class="sound-wave-bar"></span>
+              <span class="sound-wave-bar"></span>
+            </span>
+          </button>
+          <button id="sample-preset-1" class="hud-btn" style="padding: 5px 8px; font-size: 0.72rem;">접선</button>
+          <button id="sample-preset-2" class="hud-btn" style="padding: 5px 8px; font-size: 0.72rem;">함정</button>
+          <button id="clear-chat-btn" class="hud-btn" style="padding: 5px 8px; font-size: 0.72rem;">비우기</button>
+        </div>
+      </div>
+
+      <!-- ⭐ 1번 사진 박스: 통화 헤더 바로 아래 고정된 실시간 수식 정제 & 검증 박스 ⭐ -->
+      <div id="live-pinned-math-box" class="live-pinned-math-container">
+        
+        <!-- 실시간 마이크 입력 감도 & 원터치 클립보드 퀵 바 -->
+        <div class="mic-live-meter-bar">
+          <div class="audio-level-display">
+            <span style="font-size:0.75rem; color:var(--text-sub);">마이크 입력 레벨:</span>
+            <div class="level-meter-track">
+              <div id="audio-level-fill" class="level-meter-fill"></div>
+            </div>
+            <span id="audio-level-val" style="font-size:0.72rem; color:var(--neon-cyan); font-family:'JetBrains Mono';">0%</span>
+          </div>
+          <button id="quick-paste-live-btn" class="hud-btn primary" style="padding:4px 10px; font-size:0.75rem;">
+            <span>📋 제미니 답변 즉시 붙여넣기</span>
+          </button>
+        </div>
+
+        <div class="pinned-speech-row">
+          <span class="gemini-voice-prefix">
+            <span class="sound-bars-mini"><span></span><span></span><span></span></span>
+            Gemini Live
+          </span>
+          <span id="pinned-transcript-text" class="pinned-transcript">오늘 풀 문제는 함수 f(x) = x^3 - 3x + 2 에 대하여 x가 1일 때의 접선의 방정식을 구하고 극값을 판정하는 거야.</span>
+          <span class="typing-cursor"></span>
+        </div>
+
+        <!-- 1번 사진 내부 정제 표준 수식 박스 -->
+        <div class="bubble-math-card pinned-math-card">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">📐 정제 표준 수식:</span>
+            <span id="pinned-diag-badge" class="step-diag-badge" style="background:rgba(0,255,136,0.18); color:var(--neon-green);">🟢 논리 무결</span>
+          </div>
+          
+          <div id="pinned-latex-display" class="bubble-math-latex" style="font-size:1.35rem; color:#00f0ff; min-height:36px; display:flex; align-items:center;">
+            f(x) = x³ - 3x + 2 &nbsp; ⟹ &nbsp; f'(x) = 3x² - 3
+          </div>
+
+          <div class="bubble-math-footer">
+            <span id="pinned-math-note" style="font-size:0.78rem; color:var(--text-muted);">x = 1 대입 시 f'(1) = 0 (수평 접선 y = 0 형성)</span>
+            <div style="display:flex; gap:6px;">
+              <button id="pinned-copy-btn" class="hud-btn primary" style="padding:4px 10px; font-size:0.75rem;">반문 복사 🚀</button>
+              <button id="pinned-send-chat-btn" class="hud-btn gold" style="padding:4px 10px; font-size:0.75rem;">대화창 전송 💬</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 카카오톡 스타일 대화 히스토리 스크롤 영역 -->
+      <div id="kakao-chat-messages" class="kakao-messages-area">
+        <!-- 이전 말풍선들이 카톡처럼 차곡차곡 스크롤 누적 -->
+      </div>
+
+      <!-- 하단 메시지/반문 전송 바 -->
+      <div class="kakao-chat-input-bar">
+        <button id="quick-scenario-btn" class="hud-btn primary" style="padding: 7px 12px; font-size: 0.8rem;" title="제미니 반문 즉시 발송">
+          <span>💬 반문 전송</span>
+        </button>
+        <input type="text" id="chat-quick-input" placeholder="제미니에게 질문할 내용이나 수식을 입력하세요..." />
+        <button id="chat-send-btn" class="hud-btn gold" style="padding: 7px 14px; font-size: 0.82rem;">전송</button>
+      </div>
+    </section>
+
+    <!-- Right Column: JSXGraph Interactive Canvas & Gemini Prompt Scenarios -->
+    <section class="right-column-stack">
+      
+      <!-- [기능 2] JSXGraph 인터랙티브 애니메이션 엔진 -->
+      <div class="hud-panel graph-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="icon">📈</span>
+            <span>JSXGraph 인터랙티브 동적 애니메이션</span>
+          </div>
+          <div style="display: flex; gap: 6px;">
+            <button id="graph-anim-btn" class="hud-btn gold" style="padding: 5px 12px; font-size: 0.78rem;">
+              <span id="anim-icon">▶</span> <span id="anim-text">동적 애니메이션 재생</span>
+            </button>
+            <button id="graph-reset-btn" class="hud-btn" style="padding: 5px 8px; font-size: 0.78rem;" title="그래프 시점 초기화">
+              ↺
+            </button>
+          </div>
+        </div>
+
+        <!-- JSXGraph 캔버스 보드 -->
+        <div id="jxgbox"></div>
+
+        <!-- 실시간 동적 수치 HUD -->
+        <div class="graph-stats-hud">
+          <div class="stat-item">
+            <span class="stat-label">접점 x (P.x)</span>
+            <span id="stat-x" class="stat-val">1.00</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">함숫값 y (P.y)</span>
+            <span id="stat-y" class="stat-val">0.00</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">접선 기울기 m (f')</span>
+            <span id="stat-slope" class="stat-val">0.00</span>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted);">
+          <span>동적 접선의 방정식: <strong id="stat-tangent-formula" style="color: var(--neon-pink); margin-left: 4px;">y = 0</strong></span>
+          <span>(점 P를 드래그하거나 애니메이션 버튼을 터치하세요)</span>
+        </div>
+      </div>
+
+      <!-- [기능 3] 제미니 즉시 반문 & 2단계 꼬리물기 질문 HUD 패널 -->
+      <div class="hud-panel scenario-panel">
+        <div class="panel-header">
+          <div class="panel-title">
+            <span class="icon">💬</span>
+            <span>제미니 즉시 반문 & 2단계 꼬리물기 질문</span>
+          </div>
+          <span id="current-scenario-badge" class="prompt-badge">시나리오 1</span>
+        </div>
+
+        <!-- 시나리오 1, 2, 3 탭 -->
+        <div class="scenario-tabs">
+          <button class="tab-btn active" data-scenario="scenario1">시나리오 1: 그래프 직관 풀이</button>
+          <button class="tab-btn" data-scenario="scenario2">시나리오 2: 논리 비약/조건 검증</button>
+          <button class="tab-btn" data-scenario="scenario3">시나리오 3: 수능 실전 속해법</button>
+        </div>
+
+        <!-- 1차 즉시 반문 카드 -->
+        <div class="prompt-card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="prompt-badge" style="background: rgba(0, 240, 255, 0.15); color: var(--neon-cyan); border-color: rgba(0, 240, 255, 0.3);">
+              🚀 1차 즉시 반문 (원터치 복사)
+            </span>
+            <button id="copy-first-prompt-btn" class="hud-btn primary" style="padding: 5px 12px; font-size: 0.78rem;">
+              <span>📋</span> 제미니에게 반문 복사
+            </button>
+          </div>
+          <div id="first-prompt-text" class="prompt-text">
+            지금 풀어준 식 전개 방식은 이해했어. 그런데 이 문제를 대수적 계산을 최소화하고, f(x)와 g(x)의 그래프 개형이나 교점의 위치 관계, 접선 성질을 이용해서 직관적으로 푸는 기하학적 풀이도 보여줄래?
+          </div>
+        </div>
+
+        <!-- 2차 꼬리물기 질문 세트 -->
+        <div style="margin-top: 4px;">
+          <div style="font-size: 0.78rem; font-weight: 700; color: var(--neon-gold); margin-bottom: 6px;">
+            ↪ 제미니 답변 후 던지는 2차 꼬리물기 질문 3선:
+          </div>
+          <div id="followups-container" class="follow-ups-list">
+            <!-- Populated dynamically by app.js -->
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+  </main>
+
+  <!-- 🚀 태블릿 분할화면 전용: 원터치 클립보드 분석 & 스마트 자동감지 플로팅 독 -->
+  <div id="tablet-quick-clipboard-dock" class="tablet-clipboard-dock">
+    <button id="floating-analyze-btn" class="floating-analyze-btn" title="제미니에서 복사한 풀이 즉시 분석">
+      <span class="fab-icon">⚡</span>
+      <span class="fab-text">제미니 풀이 원터치 분석</span>
+    </button>
+    <div class="smart-auto-toggle-box" title="화면 복귀 시 복사된 풀이 자동 감지 & 분석">
+      <label class="toggle-switch">
+        <input type="checkbox" id="smart-auto-clipboard-toggle" checked>
+        <span class="toggle-slider"></span>
+      </label>
+      <span class="toggle-label">스마트 자동문</span>
+    </div>
+  </div>
+
+  <!-- Inlined Direct Bulletproof Handler for Mic -->
+  <script>
+    // 서비스 워커 캐시 완전 삭제 및 강제 해제 (옛날 버전이 계속 뜨는 문제 원천 차단)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for (let registration of registrations) {
+          registration.unregister();
+          console.log('이전 서비스워커 강제 해제 완료');
+        }
+      });
+      if (window.caches) {
+        caches.keys().then(function(names) {
+          for (let name of names) caches.delete(name);
+        });
+      }
+    }
+
+    // 마이크 인라인 핸들러: 어떤 자바스크립트 라이브러리 로딩 지연과 무관하게 100% 즉시 시각 피드백 발동!
+    window.handleMicClick = function() {
+      const btn = document.getElementById('mic-toggle-btn');
+      const textEl = document.getElementById('mic-btn-text');
+      const pulseEl = document.getElementById('speech-pulse');
+      const statusText = document.getElementById('speech-status-text');
+      
+      const currentState = btn.getAttribute('data-state') || 'idle';
+      console.log('handleMicClick executed! State before:', currentState);
+
+      if (currentState === 'listening') {
+        // [2번째 터치]: 🔴 즉시 붉은색 점멸 종료 모드 발동!
+        btn.setAttribute('data-state', 'stopped');
+        if (textEl) textEl.textContent = '🔴 [종료됨] 음성 청취 정지';
+        if (pulseEl) pulseEl.className = 'pulse-dot';
+        if (statusText) statusText.textContent = '음성 인식이 종료되었습니다.';
+        
+        // 실제 음성 녹음 중지
+        if (window.appStopListening) {
+          window.appStopListening();
+        }
+
+        if (window.stopBlinkTimer) clearTimeout(window.stopBlinkTimer);
+        window.stopBlinkTimer = setTimeout(() => {
+          btn.setAttribute('data-state', 'idle');
+          if (textEl) textEl.textContent = '실시간 음성 시작';
+          if (statusText) statusText.textContent = '대기 중';
+        }, 2500);
+
+      } else {
+        // [1번째 터치]: 🎙️ 즉시 구글 4색 활성화 및 듣는 중 모드 발동!
+        if (window.stopBlinkTimer) clearTimeout(window.stopBlinkTimer);
+        btn.setAttribute('data-state', 'listening');
+        if (textEl) textEl.textContent = '구글 음성 듣는 중... (말씀하세요)';
+        if (pulseEl) pulseEl.className = 'pulse-dot live';
+        if (statusText) statusText.textContent = '말하는 내용을 실시간 타이핑 중...';
+        
+        // 실제 음성 녹음 시작
+        if (window.appStartListening) {
+          window.appStartListening();
+        }
+      }
+    };
+  </script>
+
+  <!-- Core Scripts with Cache Buster Timestamp -->
+  <script src="./js/storage.js?v=20260920_v5"></script>
+  <script src="./js/mathParser.js?v=20260920_v5"></script>
+  <script src="./js/proofChecker.js?v=20260920_v5"></script>
+  <script src="./js/graphEngine.js?v=20260920_v5"></script>
+  <script src="./js/questionPrompts.js?v=20260920_v5"></script>
+  <script src="./js/app.js?v=20260920_v5"></script>
+
+  <!-- 📱 태블릿 모바일 개발자 콘솔 (Eruda) 및 자체 진단 도구 탑재 -->
+  <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+  <script>
+    eruda.init();
+    console.log("%c[Eruda] 모바일 개발자 콘솔 활성화 완료!", "color: #00f0ff; font-weight: bold; font-size: 14px;");
+    console.log("%c👉 음성인식 원인 정밀 검증을 원하시면 콘솔에 runSpeechDiagnosis() 를 입력하고 엔터를 치세요.", "color: #ffd000; font-weight: bold;");
+
+    window.runSpeechDiagnosis = function() {
+      console.clear();
+      console.log("%c========================================================", "color: #00f0ff; font-weight: bold;");
+      console.log("%c  🔍 [Gemini Math HUD] 태블릿 실시간 음성인식 정밀 자체 검증", "color: #00f0ff; font-weight: bold; font-size: 14px;");
+      console.log("%c========================================================", "color: #00f0ff; font-weight: bold;");
+
+      // 1. 보안 컨텍스트 검사
+      const isSecure = window.isSecureContext;
+      console.log(`1. 보안 컨텍스트 (isSecureContext): ${isSecure ? '✅ 안전함 (정상)' : '❌ 불안전함 (HTTP 사설 IP 차단 상태)'}`);
+      if (!isSecure) {
+        console.error("🚨 [원인 1 발견] 브라우저가 현재 주소를 안전하지 않은 주소로 판단하여 마이크를 차단했습니다.");
+        console.warn("💡 해결법: chrome://flags/#unsafely-treat-insecure-origin-as-secure 에 현재 주소를 등록하세요.");
+      }
+
+      // 2. Web Speech API 지원 검사
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+      console.log(`2. Web Speech API 엔진: ${SR ? '✅ 사용 가능' : '❌ 미지원 브라우저'}`);
+      if (!SR) {
+        console.error("🚨 [원인 2 발견] 현재 브라우저에 SpeechRecognition 엔진이 없습니다. 크롬(Chrome)을 사용해주세요.");
+        return;
+      }
+
+      // 3. 실제 마이크 및 구글 STT 서버 통신 진단
+      console.log("3. 마이크 및 구글 STT 서버 연결 진단 시도 중... (마이크에 말씀해보세요)");
+      const tester = new SR();
+      tester.lang = 'ko-KR';
+      tester.continuous = false;
+      tester.interimResults = true;
+
+      tester.onstart = () => {
+        console.log("%c🎙️ [성공] 마이크 하드웨어 스트림 연결 완료! (소리를 기다리는 중)", "color: #00ff88; font-weight: bold;");
+      };
+
+      tester.onsoundstart = () => {
+        console.log("%c🔊 [성공] 마이크를 통해 실제 음성 파형이 감지되었습니다!", "color: #00ff88; font-weight: bold;");
+      };
+
+      tester.onresult = (e) => {
+        const transcript = e.results[0][0].transcript;
+        console.log(`%c🎉 [대성공!] 구글 STT 텍스트 수신됨: "${transcript}"`, "color: #00ff88; font-weight: bold; font-size: 15px;");
+        if (window.QuestionPromptsManager && QuestionPromptsManager.showToast) {
+          QuestionPromptsManager.showToast(`음성인식 성공: "${transcript}"`, 'success');
+        }
+      };
+
+      tester.onerror = (e) => {
+        console.error(`%c❌ 음성인식 엔진 에러 발생: [${e.error}]`, "color: #ff3366; font-weight: bold; font-size: 14px;");
+        if (e.error === 'network') {
+          console.error("👉 [결정적 원인]: 구글 STT 클라우드 서버와의 통신이 거부되었습니다.");
+          console.error("   사유: 사설 SSL(자체서명) 인증서 경고 상태이거나 인터넷 연결이 불안정합니다.");
+          console.warn("   해결: chrome://flags 에서 사설 IP를 예외 등록하거나, 정식 터널링(ngrok)을 사용하세요.");
+        } else if (e.error === 'audio-capture') {
+          console.error("👉 [결정적 원인]: 마이크를 다른 프로세스(오디오 볼륨 미터)가 선점하고 있어 음성을 가져오지 못했습니다.");
+        } else if (e.error === 'not-allowed') {
+          console.error("👉 [결정적 원인]: 마이크 사용 권한이 거부되었습니다. 주소창 자물쇠/설정에서 허용해주세요.");
+        } else if (e.error === 'no-speech') {
+          console.warn("👉 [안내]: 음성이 감지되지 않았습니다. 마이크 가까이에서 크게 말씀해보세요.");
+        }
+      };
+
+      tester.onend = () => {
+        console.log("⏹️ 진단 테스트 세션이 종료되었습니다.");
+      };
+
+      try {
+        tester.start();
+      } catch (err) {
+        console.error("테스트 실행 중 예외:", err);
+      }
+    };
+  </script>
+</body>
+</html>

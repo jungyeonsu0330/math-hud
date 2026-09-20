@@ -1,0 +1,17 @@
+{
+  "name": "Gemini Math Live HUD",
+  "short_name": "Math HUD",
+  "description": "태블릿 전용 제미니 실시간 수학 수식 변환, 오류 검증 & 다각도 풀이 HUD",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0a0e17",
+  "theme_color": "#00f0ff",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

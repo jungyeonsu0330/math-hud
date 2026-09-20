@@ -1,0 +1,5 @@
+# Git Ignore for Gemini Math Live HUD
+__pycache__/
+*.pem
+.DS_Store
+Thumbs.db
